@@ -12,11 +12,11 @@
 
   "repository": {
     "type": "git",
-    "url": "git://github.com/hubot-scripts/hubot-example.git"
+    "url": "git://github.com/codeandfury/hubot-jenkins-enhanced.git"
   },
 
   "bugs": {
-    "url": "https://github.com/hubot-scripts/hubot-example/issues"
+    "url": "https://github.com/codeandfury/hubot-jenkins-enhanced/issues"
   },
 
   "dependencies": {
@@ -24,10 +24,6 @@
   },
 
   "devDependencies": {
-    "mocha": "*",
-    "chai": "*",
-    "sinon-chai": "*",
-    "sinon": "*"
   },
 
   "main": "index.coffee",
