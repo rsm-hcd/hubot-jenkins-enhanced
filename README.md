@@ -4,10 +4,10 @@ Jenkins integration for Hubot with multiple server support
 
 
 ### Configuration
-- HUBOT_JENKINS_URL
-- HUBOT_JENKINS_AUTH
-- HUBOT_JENKINS_{1-N}_URL
-- HUBOT_JENKINS_{1-N}_AUTH
+- ```HUBOT_JENKINS_URL```
+- ```HUBOT_JENKINS_AUTH```
+- ```HUBOT_JENKINS_{1-N}_URL```
+- ```HUBOT_JENKINS_{1-N}_AUTH```
 
     - Auth should be in the "user:password" format.
 
