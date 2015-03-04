@@ -59,13 +59,14 @@ class JenkinsServer
   url: null
   auth: null
   _hasListed: false
-
   _jobs: null
+  _querystring: null
 
   constructor: (url, auth) ->
     @url = url
     @auth = auth
     @_jobs = []
+    @_querystring = require 'querystring'
 
   hasInitialized: ->
     @_hasListed
@@ -81,7 +82,7 @@ class JenkinsServer
     @_jobs.length > 0
 
   hasJobByName: (jobName) =>
-    jobName = jobName.replace('%20', ' ')
+    jobName = @_querystring.unescape(jobName)
     @_jobs.where(name: jobName).length > 0
 
 
