@@ -81,6 +81,7 @@ class JenkinsServer
     @_jobs.length > 0
 
   hasJobByName: (jobName) =>
+    jobName = jobName.replace('%20', ' ')
     @_jobs.where(name: jobName).length > 0
 
 
