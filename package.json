@@ -1,33 +1,25 @@
 {
   "name": "hubot-jenkins-enhanced",
   "description": "Jenkins integration for Hubot with multiple server support",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "author": "Winton De Shong <contact@winton.me>",
   "license": "MIT",
-
   "keywords": [
     "hubot",
     "hubot-scripts"
   ],
-
   "repository": {
     "type": "git",
     "url": "git://github.com/codeandfury/hubot-jenkins-enhanced.git"
   },
-
   "bugs": {
     "url": "https://github.com/codeandfury/hubot-jenkins-enhanced/issues"
   },
-
   "dependencies": {
     "coffee-script": "~1.6"
   },
-
-  "devDependencies": {
-  },
-
+  "devDependencies": {},
   "main": "index.coffee",
-
   "scripts": {
     "test": "script/test"
   }
