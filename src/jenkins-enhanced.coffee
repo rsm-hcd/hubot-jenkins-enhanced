@@ -155,9 +155,9 @@ class HubotJenkinsPlugin extends HubotMessenger
 
   constructor: (msg, serverManager) ->
     super msg
-    @_querystring = require 'querystring'
-    @_params = @msg.match[3]
+    @_querystring   = require 'querystring'
     @_serverManager = serverManager
+    @setMessage msg
 
   _init: (delayedFunction) =>
     return true if @_serverManager.hasInitialized()
@@ -240,6 +240,7 @@ class HubotJenkinsPlugin extends HubotMessenger
 
   setMessage: (message) =>
     super message
+    @_params = @msg.match[3]
     @_serverManager.setMessage message
 
   setRobot: (robot) =>
