@@ -450,31 +450,31 @@ module.exports = (robot) ->
   # Command Configuration
   # ---------------------
 
-  robot.respond /j(?:enkins)? aliases/i, (msg) ->
+  robot.respond /j(?:enkins)? aliases/i, 'jenkins.aliases', (msg) ->
     pluginFactory(msg).listAliases()
 
-  robot.respond /j(?:enkins)? build ([\w\.\-_ ]+)(, (.+))?/i, (msg) ->
+  robot.respond /j(?:enkins)? build ([\w\.\-_ ]+)(, (.+))?/i, 'jenkins.build', (msg) ->
     pluginFactory(msg).build false
 
-  robot.respond /j(?:enkins)? b (\d+)/i, (msg) ->
+  robot.respond /j(?:enkins)? b (\d+)/i, 'jenkins.b', (msg) ->
     pluginFactory(msg).buildById()
 
-  robot.respond /j(?:enkins)? list( (.+))?/i, (msg) ->
+  robot.respond /j(?:enkins)? list( (.+))?/i, 'jenkins.list', (msg) ->
     pluginFactory(msg).list()
 
-  robot.respond /j(?:enkins)? describe (.*)/i, (msg) ->
+  robot.respond /j(?:enkins)? describe (.*)/i, 'jenkins.describe', (msg) ->
     pluginFactory(msg).describe()
 
-  robot.respond /j(?:enkins)? getAlias (.*)/i, (msg) ->
+  robot.respond /j(?:enkins)? getAlias (.*)/i, 'jenkins.getAlias', (msg) ->
     pluginFactory(msg).getAlias()
 
-  robot.respond /j(?:enkins)? last (.*)/i, (msg) ->
+  robot.respond /j(?:enkins)? last (.*)/i, 'jenkins.last', (msg) ->
     pluginFactory(msg).last()
 
-  robot.respond /j(?:enkins)? servers/i, (msg) ->
+  robot.respond /j(?:enkins)? servers/i, 'jenkins.servers', (msg) ->
     pluginFactory(msg).servers()
 
-  robot.respond /j(?:enkins)? setAlias (.*), (.*)/i, (msg) ->
+  robot.respond /j(?:enkins)? setAlias (.*), (.*)/i, 'jenkins.setAlias', (msg) ->
     pluginFactory(msg).setAlias()
 
   robot.jenkins =
