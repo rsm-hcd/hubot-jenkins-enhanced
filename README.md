@@ -4,7 +4,7 @@ Jenkins integration for Hubot with multiple server support
 
 
 ### Configuration
-Auth should be in the "user:password" format.
+Auth should be in the "user:password" format encode with base64.
 
 - ```HUBOT_JENKINS_URL```
 - ```HUBOT_JENKINS_AUTH```
