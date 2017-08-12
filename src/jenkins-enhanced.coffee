@@ -274,6 +274,9 @@ class HubotJenkinsPlugin extends HubotMessenger
     auth = new Buffer(selectedAuth).toString('base64')
     request.headers Authorization: "Basic #{auth}"
     request.header('Content-Length', 0)
+    jenkinsCrumb = process.env.HUBOT_JENKINS_CRUMB
+    if jenkinsCrumb
+      request.header('Jenkins-Crumb', jenkinsCrumb)
     request
 
   _describeJob: (job) =>
