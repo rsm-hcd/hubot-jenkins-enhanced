@@ -8,6 +8,7 @@ Auth should be in the "user:password" format.
 
 - ```HUBOT_JENKINS_URL```
 - ```HUBOT_JENKINS_AUTH```
+- ```HUBOT_JENKINS_CRUMB```
 - ```HUBOT_JENKINS_{1-N}_URL```
 - ```HUBOT_JENKINS_{1-N}_AUTH```
 
