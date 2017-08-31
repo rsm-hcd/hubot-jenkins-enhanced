@@ -11,7 +11,7 @@
 #   HUBOT_JENKINS_{1-N}_URL
 #   HUBOT_JENKINS_{1-N}_AUTH
 #
-#   Auth should be in the "user:password" format.
+#   Auth should be in the "user:password" format encode with base64.
 #
 # Commands:
 #   hubot jenkins aliases - lists all saved job name aliases
@@ -272,7 +272,7 @@ class HubotJenkinsPlugin extends HubotMessenger
     defaultAuth = process.env.HUBOT_JENKINS_AUTH
     return if not server and not defaultAuth
     selectedAuth = if server then server.auth else defaultAuth
-    auth = new Buffer(selectedAuth).toString('base64')
+    auth = new Buffer(selectedAuth)
     request.headers Authorization: "Basic #{auth}"
     request.header('Content-Length', 0)
     jenkinsCrumb = process.env.HUBOT_JENKINS_CRUMB
