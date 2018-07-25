@@ -4,7 +4,8 @@ Jenkins integration for Hubot with multiple server support with the use of acces
 
 
 ### Configuration
-Auth should be in the "user:access-token" format.
+Auth should be in the "user:access-token" format.\
+You can find your access token at $JENKINS_URL/me/configure and ensure it is the same for all Jenkins instances.\
 'Trigger builds remotely' must be enabled for projects you wish to build remotely and must use the same Remote Token
 ![Trigger builds remotely project configuration](screenshots/trigger-builds-remote-config.png)
 
