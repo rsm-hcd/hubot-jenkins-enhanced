@@ -1,14 +1,16 @@
 # Hubot Jenkins Enhanced Plugin
 
-Jenkins integration for Hubot with multiple server support
+Jenkins integration for Hubot with multiple server support with the use of access tokens instead of password authentication.
 
 
 ### Configuration
-Auth should be in the "user:password" format.
+Auth should be in the "user:access-token" format.
+'Trigger builds remotely' must be enabled for projects you wish to build remotely and must use the same Remote Token
+![Trigger builds remotely project configuration](screenshots/trigger-builds-remote-config.png)
 
 - ```HUBOT_JENKINS_URL```
 - ```HUBOT_JENKINS_AUTH```
-- ```HUBOT_JENKINS_CRUMB```
+- ```HUBOT_JENKINS_REMOTE_TOKEN```
 - ```HUBOT_JENKINS_{1-N}_URL```
 - ```HUBOT_JENKINS_{1-N}_AUTH```
 

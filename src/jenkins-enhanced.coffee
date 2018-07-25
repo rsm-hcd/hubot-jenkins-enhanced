@@ -7,11 +7,12 @@
 # Configuration:
 #   HUBOT_JENKINS_URL
 #   HUBOT_JENKINS_AUTH
-#   HUBOT_JENKINS_CRUMB
+#   HUBOT_JENKINS_REMOTE_TOKEN
 #   HUBOT_JENKINS_{1-N}_URL
 #   HUBOT_JENKINS_{1-N}_AUTH
 #
-#   Auth should be in the "user:password" format.
+#   Auth should be in the "user:access-token" format.
+#   'Trigger builds remotely' must be enabled for projects you wish to build remotely and must use the same Remote Token
 #
 # Commands:
 #   hubot jenkins aliases - lists all saved job name aliases
@@ -191,10 +192,11 @@ class HubotJenkinsPlugin extends HubotMessenger
 
   build: (buildWithEmptyParameters) =>
     return if not @_init(@build)
+    token = process.env.HUBOT_JENKINS_REMOTE_TOKEN
     job = @_getJob(true)
     server = @_serverManager.getServerByJobName(job)
     command = if buildWithEmptyParameters then "buildWithParameters" else "build"
-    path = if @_params then "job/#{job}/buildWithParameters?#{@_params}" else "job/#{job}/#{command}"
+    path = if @_params then "job/#{job}/buildWithParameters?#{@_params}" else "job/#{job}/#{command}?token=#{token}"
     @_requestFactorySingle server, path, @_handleBuild, "post"
 
   describe: =>
@@ -272,12 +274,9 @@ class HubotJenkinsPlugin extends HubotMessenger
     defaultAuth = process.env.HUBOT_JENKINS_AUTH
     return if not server and not defaultAuth
     selectedAuth = if server then server.auth else defaultAuth
-    auth = new Buffer(selectedAuth).toString('base64')
-    request.headers Authorization: "Basic #{auth}"
+    #auth = new Buffer(selectedAuth).toString('base64')
+    #request.headers Authorization: "Basic #{auth}"
     request.header('Content-Length', 0)
-    jenkinsCrumb = process.env.HUBOT_JENKINS_CRUMB
-    if jenkinsCrumb
-      request.header('Jenkins-Crumb', jenkinsCrumb)
     request
 
   _describeJob: (job) =>
@@ -338,7 +337,10 @@ class HubotJenkinsPlugin extends HubotMessenger
     @_requestFactorySingle server, path, @_handleLastBuildStatus
 
   _requestFactorySingle: (server, endpoint, callback, method = "get") =>
-    path = "#{server.url}/#{endpoint}"
+    user = server.auth.split(":")
+    if server.url.indexOf('https') == 0 then http = 'https://' else http = 'http://'
+    url = server.url.replace /^https?:\/\//, ''
+    path = "#{http}#{user[0]}:#{user[1]}@#{url}/#{endpoint}"
     request = @msg.http(path)
     @_configureRequest request, server
     request[method]() ((err, res, body) -> callback(err, res, body, server))
