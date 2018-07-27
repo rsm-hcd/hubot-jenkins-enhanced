@@ -1,6 +1,22 @@
-# Hubot Jenkins Enhanced Plugin
+# Hubot Jenkins Enhanced Improved Plugin
 
 Jenkins integration for Hubot with multiple server support with the use of access tokens instead of password authentication.
+
+Original author: [Winton DeShong](https://github.com/wintondeshong)
+
+### Installation
+
+In hubot project repo, run:
+
+`npm install git+https://github.com/zack-hable/hubot-jenkins-enhanced --save`
+
+Then add **hubot-jenkins-enhanced-improved** to your `external-scripts.json`:
+
+```json
+[
+  "hubot-jenkins-enhanced-improved"
+]
+```
 
 ### Configuration
 Auth should be in the "user:access-token" format.\
