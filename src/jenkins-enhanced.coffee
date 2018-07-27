@@ -7,26 +7,31 @@
 # Configuration:
 #   HUBOT_JENKINS_URL
 #   HUBOT_JENKINS_AUTH
-#   HUBOT_JENKINS_CRUMB
 #   HUBOT_JENKINS_{1-N}_URL
 #   HUBOT_JENKINS_{1-N}_AUTH
 #
-#   Auth should be in the "user:password" format.
+#   Auth should be in the "user:access-token" format.
 #
 # Commands:
 #   hubot jenkins aliases - lists all saved job name aliases
 #   hubot jenkins b <jobNumber> - builds the job specified by jobNumber. List jobs to get number.
+#   hubot jenkins b <jobNumber>, <params> - builds the job specified by jobNumber with parameters as key=value&key2=value2. List jobs to get number.
 #   hubot jenkins build <job> - builds the specified Jenkins job
 #   hubot jenkins build <job>, <params> - builds the specified Jenkins job with parameters as key=value&key2=value2
+#   hubot jenkins d <jobNumber> - Describes the job specified by jobNumber. List jobs to get number.
 #   hubot jenkins describe <job> - Describes the specified Jenkins job
 #   hubot jenkins getAlias <name> - Retrieve value of job name alias
 #   hubot jenkins list <filter> - lists Jenkins jobs grouped by server
+#   hubot jenkins l <jobNumber> - Details about the last build for the job specified by jobNumber. List jobs to get number.
 #   hubot jenkins last <job> - Details about the last build for the specified Jenkins job
 #   hubot jenkins servers - Lists known jenkins servers
 #   hubot jenkins setAlias <name>, <value> - creates job name alias
+#   hubot jenkins remAlias <name> - removes job name alias
 #
 # Author:
 #   wintondeshong
+# Contributor:
+#   zack-hable
 
 
 Array::where = (query) ->
@@ -85,7 +90,7 @@ class JenkinsServer
     @_jobs.length > 0
 
   hasJobByName: (jobName) =>
-    jobName = @_querystring.unescape(jobName)
+    jobName = @_querystring.unescape(jobName).trim()
     @_jobs.where(name: jobName).length > 0
 
 
@@ -195,12 +200,27 @@ class HubotJenkinsPlugin extends HubotMessenger
     server = @_serverManager.getServerByJobName(job)
     command = if buildWithEmptyParameters then "buildWithParameters" else "build"
     path = if @_params then "job/#{job}/buildWithParameters?#{@_params}" else "job/#{job}/#{command}"
+    if !server
+      @msg.send "I couldn't find any servers with a job called #{@_getJob()}.  Try `jenkins servers` to get a list."
+      return
     @_requestFactorySingle server, path, @_handleBuild, "post"
+
+  describeById: =>
+    return if not @_init(@describeById)
+    job = @_getJobById()
+    if not job
+      @reply "I couldn't find that job. Try `jenkins list` to get a list."
+      return  
+    @_setJob job
+    @describe()
 
   describe: =>
     return if not @_init(@describe)
-    job = @_getJob()
+    job = @_getJob(true)
     server = @_serverManager.getServerByJobName(job)
+    if !server
+      @msg.send "I couldn't find any servers with a job called #{@_getJob()}.  Try `jenkins servers` to get a list."
+      return
     @_requestFactorySingle server, "job/#{job}/api/json", @_handleDescribe
 
   getAlias: =>
@@ -209,11 +229,23 @@ class HubotJenkinsPlugin extends HubotMessenger
     aliasValue = aliases[aliasKey]
     @msg.send "'#{aliasKey}' is an alias for '#{aliasValue}'"
 
+  lastById: =>
+    return if not @_init(@lastById)
+    job = @_getJobById()
+    if not job
+      @reply "I couldn't find that job. Try `jenkins list` to get a list."
+      return  
+    @_setJob job
+    @last()
+	
   last: =>
     return if not @_init(@last)
     job = @_getJob()
     server = @_serverManager.getServerByJobName(job)
     path = "job/#{job}/lastBuild/api/json"
+    if !server
+      @msg.send "I couldn't find any servers with a job called #{@_getJob()}.  Try `jenkins servers` to get a list."
+      return
     @_requestFactorySingle server, path, @_handleLast
 
   list: (isInit = false) =>
@@ -235,9 +267,19 @@ class HubotJenkinsPlugin extends HubotMessenger
     aliases    = @_getSavedAliases()
     aliasKey   = @msg.match[1]
     aliasValue = @msg.match[2]
+    if aliases[aliasKey]
+      @msg.send "An alias already exists for #{aliasKey} and is mapped to #{aliasValue}.  Please use `jenkins remAlias #{aliasKey}` to remove this alias if you want to update the value."
+      return
     aliases[aliasKey] = aliasValue
     @robot.brain.set 'jenkins_aliases', aliases
     @msg.send "'#{aliasKey}' is now an alias for '#{aliasValue}'"
+	
+  remAlias: =>
+    aliases    = @_getSavedAliases()
+    aliasKey   = @msg.match[1]
+    delete aliases[aliasKey]
+    @robot.brain.set 'jenkins_aliases', aliases
+    @msg.send "'#{aliasKey}' has been removed"
 
   setMessage: (message) =>
     super message
@@ -272,12 +314,9 @@ class HubotJenkinsPlugin extends HubotMessenger
     defaultAuth = process.env.HUBOT_JENKINS_AUTH
     return if not server and not defaultAuth
     selectedAuth = if server then server.auth else defaultAuth
-    auth = new Buffer(selectedAuth).toString('base64')
-    request.headers Authorization: "Basic #{auth}"
+    #auth = new Buffer(selectedAuth).toString('base64')
+    #request.headers Authorization: "Basic #{auth}"
     request.header('Content-Length', 0)
-    jenkinsCrumb = process.env.HUBOT_JENKINS_CRUMB
-    if jenkinsCrumb
-      request.header('Jenkins-Crumb', jenkinsCrumb)
     request
 
   _describeJob: (job) =>
@@ -288,7 +327,7 @@ class HubotJenkinsPlugin extends HubotMessenger
     response += "ENABLED: #{job.buildable}\n"
     response += "STATUS: #{job.color}\n"
     response += @_describeJobHealthReport(job.healthReport)
-    response += @_describeJobActions(job.actions)
+    response += if job._class.includes 'Project' then @_describeJobActions(job.actions) else @_describeJobActions(job.property)
     response
 
   _describeJobActions: (actions) =>
@@ -314,7 +353,7 @@ class HubotJenkinsPlugin extends HubotMessenger
     "HEALTH: #{result}\n"
 
   _getJob: (escape = false) =>
-    job = @msg.match[1]
+    job = @msg.match[1].trim()
 
     # if the provided name is an alias, provide it's mapped job name
     aliases = @_getSavedAliases()
@@ -338,7 +377,10 @@ class HubotJenkinsPlugin extends HubotMessenger
     @_requestFactorySingle server, path, @_handleLastBuildStatus
 
   _requestFactorySingle: (server, endpoint, callback, method = "get") =>
-    path = "#{server.url}/#{endpoint}"
+    user = server.auth.split(":")
+    if server.url.indexOf('https') == 0 then http = 'https://' else http = 'http://'
+    url = server.url.replace /^https?:\/\//, ''
+    path = "#{http}#{user[0]}:#{user[1]}@#{url}/#{endpoint}"
     request = @msg.http(path)
     @_configureRequest request, server
     request[method]() ((err, res, body) -> callback(err, res, body, server))
@@ -404,7 +446,6 @@ class HubotJenkinsPlugin extends HubotMessenger
     try
       response = ""
       content = JSON.parse(body)
-      console.log(JSON.stringify(content, null, 4))
       jobstatus = content.result || 'PENDING'
       jobdate = new Date(content.timestamp);
       response += "LAST JOB: #{jobstatus}, #{jobdate}\n"
@@ -460,7 +501,7 @@ module.exports = (robot) ->
   robot.respond /j(?:enkins)? build ([\w\.\-_ ]+)(, (.+))?/i, id: 'jenkins.build', (msg) ->
     pluginFactory(msg).build false
 
-  robot.respond /j(?:enkins)? b (\d+)/i, id: 'jenkins.b', (msg) ->
+  robot.respond /j(?:enkins)? b (\d+)(, (.+))?/i, id: 'jenkins.b', (msg) ->
     pluginFactory(msg).buildById()
 
   robot.respond /j(?:enkins)? list( (.+))?/i, id: 'jenkins.list', (msg) ->
@@ -468,6 +509,9 @@ module.exports = (robot) ->
 
   robot.respond /j(?:enkins)? describe (.*)/i, id: 'jenkins.describe', (msg) ->
     pluginFactory(msg).describe()
+	
+  robot.respond /j(?:enkins)? d (\d+)/i, id: 'jenkins.d', (msg) ->
+    pluginFactory(msg).describeById()
 
   robot.respond /j(?:enkins)? getAlias (.*)/i, id: 'jenkins.getAlias', (msg) ->
     pluginFactory(msg).getAlias()
@@ -475,11 +519,17 @@ module.exports = (robot) ->
   robot.respond /j(?:enkins)? last (.*)/i, id: 'jenkins.last', (msg) ->
     pluginFactory(msg).last()
 
+  robot.respond /j(?:enkins)? l (\d+)/i, id: 'jenkins.l', (msg) ->
+    pluginFactory(msg).lastById()
+
   robot.respond /j(?:enkins)? servers/i, id: 'jenkins.servers', (msg) ->
     pluginFactory(msg).servers()
 
   robot.respond /j(?:enkins)? setAlias (.*), (.*)/i, id: 'jenkins.setAlias', (msg) ->
     pluginFactory(msg).setAlias()
+	
+  robot.respond /j(?:enkins)? remAlias (.*)/i, id: 'jenkins.remAlias', (msg) ->
+    pluginFactory(msg).remAlias()
 
   robot.jenkins =
     aliases:  ((msg) -> pluginFactory(msg).listAliases())
@@ -490,3 +540,4 @@ module.exports = (robot) ->
     list:     ((msg) -> pluginFactory(msg).list())
     servers:  ((msg) -> pluginFactory(msg).servers())
     setAlias: ((msg) -> pluginFactory(msg).setAlias())
+    remAlias: ((msg) -> pluginFactory(msg).remAlias())
