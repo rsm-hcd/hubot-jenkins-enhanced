@@ -67,13 +67,53 @@ class JenkinsServer
   url: null
   auth: null
   _hasListed: false
-  _jobs: null
+  _rootFolder: null
   _querystring: null
 
   constructor: (url, auth) ->
     @url = url
     @auth = auth
+    @_querystring = require 'querystring'
+
+  hasInitialized: ->
+    @_hasListed
+
+  setFolder: (folder) =>
+    @_hasListed = true
+    @_rootFolder = folder
+
+  getFolder: =>
+    @_rootFolder
+
+  hasFolder: =>
+    true if @_rootFolder
+
+  getFolderByName: (folderName) =>
+    @_rootFolder.getFolderByName(folderName)
+
+  hasFolderByName: (folderName) =>
+    @_rootFolder.hasFolderByName(folderName)
+
+  getJobByName: (jobName) =>
+    @_rootFolder.getJobByName(jobName)
+
+  hasFolderByName: (jobName) =>
+    @_rootFolder.hasJobByName(jobName)
+
+class JenkinsFolder
+  name: null
+  path: null
+  depth: null
+  _jobs: null
+  _folders: null
+  _querystring: null
+
+  constructor: (name, path, depth) ->
+    @name = name
+    @path = path
+    @depth = depth
     @_jobs = []
+    @_folders = []
     @_querystring = require 'querystring'
 
   hasInitialized: ->
@@ -81,7 +121,7 @@ class JenkinsServer
 
   addJob: (job) =>
     @_hasListed = true
-    @_jobs.push job if not @hasJobByName job.name
+    @_jobs.push job if not @hasJobByName(job.name, false)
 
   getJobs: =>
     @_jobs
@@ -89,9 +129,52 @@ class JenkinsServer
   hasJobs: =>
     @_jobs.length > 0
 
-  hasJobByName: (jobName) =>
+  getJobByName: (jobName, recursive=true) =>
     jobName = @_querystring.unescape(jobName).trim()
-    @_jobs.where(name: jobName).length > 0
+    job = @_jobs.where(name: jobName)
+    return job if job.length > 0
+    # otherwise we must start searching the other folders
+    if (recursive)
+      for folder in @_folders
+        job = folder.getJobByName(jobName)
+        return job if job.length > 0
+    null
+
+  hasJobByName: (jobName, recursive=true) =>
+    @getJobByName(jobName, recursive) != null
+
+  addFolder: (folder) =>
+    @_hasListed = true
+    @_folders.push folder if not @hasFolderByName(folder.name, false)
+
+  getFolders: =>
+    @_folders.sort((a,b) => true if (a.name > b.name))
+
+  hasFolders: =>
+    @_folders.length > 0
+
+  getFolderByName: (folderName, recursive=true) =>
+    folderName = @_querystring.unescape(folderName).trim()
+    folder = @_folders.where(name: folderName)
+    return folder if folder.length > 0
+    if (recursive)
+      for folder in @_folders
+        folder = folder.getFolderByName(folderName)
+        return folder if folder.length > 0
+    null
+
+  hasFolderByName: (folderName, recursive=true) =>
+    @getFolderByName(folderName, recursive) != null
+
+class JenkinsJob
+  name: null
+  path: null
+  state: null
+
+  constructor: (name, path, state) ->
+    @name = name
+    @path = path
+    @state = state
 
 
 class JenkinsServerManager extends HubotMessenger
@@ -104,7 +187,8 @@ class JenkinsServerManager extends HubotMessenger
   getServerByJobName: (jobName) =>
     @send "ERROR: Make sure to run a 'list' to update the job cache" if not @serversHaveJobs()
     for server in @_servers
-      return server if server.hasJobByName(jobName)
+      for folder in server.getFolders()
+        return server if folder.hasJobByName(jobName)
     null
 
   hasInitialized: =>
@@ -117,7 +201,8 @@ class JenkinsServerManager extends HubotMessenger
 
   serversHaveJobs: =>
     for server in @_servers
-      return true if server.hasJobs()
+      for folder in server.getFolders()
+        return true if folder.hasJobs()
     false
 
   servers: =>
@@ -150,12 +235,11 @@ class HubotJenkinsPlugin extends HubotMessenger
   _serverManager: null
   _querystring: null
   # stores jobs, across all servers, in flat list to support 'buildById'
+  _folderList: []
   _jobList: []
   _params: null
   # stores a function to be called after the initial 'list' has completed
   _delayedFunction: null
-
-
   # Init
   # ----
 
@@ -196,14 +280,14 @@ class HubotJenkinsPlugin extends HubotMessenger
 
   build: (buildWithEmptyParameters) =>
     return if not @_init(@build)
-    job = @_getJob(true)
+    job = @_getJob()
     server = @_serverManager.getServerByJobName(job)
     command = if buildWithEmptyParameters then "buildWithParameters" else "build"
     path = if @_params then "job/#{job}/buildWithParameters?#{@_params}" else "job/#{job}/#{command}"
     if !server
       @msg.send "I couldn't find any servers with a job called #{@_getJob()}.  Try `jenkins servers` to get a list."
       return
-    @_requestFactorySingle server, path, @_handleBuild, "post"
+    @_requestFactorySingle server, null, path, @_handleBuild, "post"
 
   describeById: =>
     return if not @_init(@describeById)
@@ -216,12 +300,13 @@ class HubotJenkinsPlugin extends HubotMessenger
 
   describe: =>
     return if not @_init(@describe)
-    job = @_getJob(true)
+    job = @_getJob()
+    console.log(job)
     server = @_serverManager.getServerByJobName(job)
     if !server
       @msg.send "I couldn't find any servers with a job called #{@_getJob()}.  Try `jenkins servers` to get a list."
       return
-    @_requestFactorySingle server, "job/#{job}/api/json", @_handleDescribe
+    @_requestFactorySingle server, null, "#{job.path}/api/json", @_handleDescribe
 
   getAlias: =>
     aliases    = @_getSavedAliases()
@@ -246,9 +331,11 @@ class HubotJenkinsPlugin extends HubotMessenger
     if !server
       @msg.send "I couldn't find any servers with a job called #{@_getJob()}.  Try `jenkins servers` to get a list."
       return
-    @_requestFactorySingle server, path, @_handleLast
+    @_requestFactorySingle server, null, path, @_handleLast
 
   list: (isInit = false) =>
+    @_requestsRunning = 0
+    @_jobList = []
     @_requestFactory "api/json", if isInit then @_handleListInit else @_handleList
 
   listAliases: =>
@@ -292,30 +379,51 @@ class HubotJenkinsPlugin extends HubotMessenger
   # Utility Methods
   # ---------------
 
-  _addJobsToJobsList: (jobs, server, outputStatus = false) =>
+  _makeRootFolderForServer: (items, server) =>
     response = ""
-    filter = new RegExp(@msg.match[2], 'i')
+    @_requestsRunning = 1
+    # make the default/root level folder
+    rootFolder = server.getFolder()
+    if rootFolder == null
+      rootFolder = new JenkinsFolder("Root", "", -1)
+      server.setFolder(rootFolder)
 
-    for job in jobs
-      # Add the job to the @_jobList
-      server.addJob(job)
-      index = @_jobList.indexOf(job.name)
-      if index == -1
-        @_jobList.push job.name
-        index = @_jobList.indexOf(job.name)
+    @_addJobsToFoldersList(items, server, rootFolder)
 
-      state = if job.color == "red" then "FAIL" else "PASS"
-      if filter.test job.name
-        response += "[#{index + 1}] #{state} #{job.name} on #{server.url}\n"
+  _addJobsToFoldersList: (items, server, folder) =>
+    for item in items
+      itemType = item._class
+      if (itemType == 'com.cloudbees.hudson.plugins.folder.Folder')
+        newFolder = new JenkinsFolder(item.name, folder.path+"/job/"+@_querystring.escape(item.name), folder.depth+1)
+        folder.addFolder(newFolder)
+        @_requestsRunning++
+        @_requestFactorySingle server, newFolder, "#{newFolder.path}/api/json", @_handleNewFolder
+      else
+        newJob = new JenkinsJob(item.name, folder.path+""+@_querystring.escape(item.name), if item.color == "red" then "FAIL" else "PASS")
+        folder.addJob(newJob)
+    # count our current folder as processed
+    @_requestsRunning--
+    @_listJobs(server, server.getFolder(), true) if @_requestsRunning == 0
 
-    @send response if outputStatus
+  _listJobs: (server, folder, isRoot=false) =>
+    response = ""
+    if isRoot
+      response += "Server: #{server.url}\n"
+    # go through each folder and list jobs first then other folders, sorted alphabetically for consistency
+    for job in folder.getJobs()
+      @_jobList.push(job) if @_jobList.indexOf(job) == -1
+      response += "\t".repeat(folder.depth+2)+"[#{@_jobList.indexOf(job) + 1}] #{job.state} #{job.name}\n"
+    for subFolder in folder.getFolders()
+      response += "\t".repeat(subFolder.depth+1)+"Folder: #{subFolder.name}\n" if subFolder.name != ""
+      response += @_listJobs(server, subFolder)
+    if isRoot and @_outputStatus
+      @send response
+    else 
+      return response
 
   _configureRequest: (request, server = null) =>
     defaultAuth = process.env.HUBOT_JENKINS_AUTH
     return if not server and not defaultAuth
-    selectedAuth = if server then server.auth else defaultAuth
-    #auth = new Buffer(selectedAuth).toString('base64')
-    #request.headers Authorization: "Basic #{auth}"
     request.header('Content-Length', 0)
     request
 
@@ -374,20 +482,21 @@ class HubotJenkinsPlugin extends HubotMessenger
     job = @_getJob()
     server = @_serverManager.getServerByJobName(job)
     path = "job/#{job}/#{lastBuild.number}/api/json"
-    @_requestFactorySingle server, path, @_handleLastBuildStatus
+    @_requestFactorySingle server, null, path, @_handleLastBuildStatus
 
-  _requestFactorySingle: (server, endpoint, callback, method = "get") =>
+  _requestFactorySingle: (server, folder, endpoint, callback, method = "get") =>
     user = server.auth.split(":")
     if server.url.indexOf('https') == 0 then http = 'https://' else http = 'http://'
     url = server.url.replace /^https?:\/\//, ''
     path = "#{http}#{user[0]}:#{user[1]}@#{url}/#{endpoint}"
+    console.log(path)
     request = @msg.http(path)
     @_configureRequest request, server
-    request[method]() ((err, res, body) -> callback(err, res, body, server))
+    request[method]() ((err, res, body) -> callback(err, res, body, server, folder))
 
   _requestFactory: (endpoint, callback, method = "get") =>
     for server in @_serverManager.listServers()
-      @_requestFactorySingle server, endpoint, callback, method
+      @_requestFactorySingle server, server.getFolder(), endpoint, callback, method
 
   _setJob: (job) =>
     @msg.match[1] = job
@@ -395,8 +504,19 @@ class HubotJenkinsPlugin extends HubotMessenger
 
   # Handlers
   # --------
+  _handleNewFolder: (err, res, body, server, folder) =>
+    if err
+      @send err
+      return
 
-  _handleBuild: (err, res, body, server) =>
+    try
+      content = JSON.parse(body)
+      @_addJobsToFoldersList content.jobs, server, folder
+      @_initComplete() if @_serverManager.hasInitialized()
+    catch error
+      @send error
+
+  _handleBuild: (err, res, body, server, folder) =>
     if err
       @reply err
     else if 200 <= res.statusCode < 400 # Or, not an error code.
@@ -408,7 +528,7 @@ class HubotJenkinsPlugin extends HubotMessenger
     else
       @reply "Status #{res.statusCode} #{body}"
 
-  _handleDescribe: (err, res, body, server) =>
+  _handleDescribe: (err, res, body, server, folder) =>
     if err
       @send err
       return
@@ -422,7 +542,7 @@ class HubotJenkinsPlugin extends HubotMessenger
     catch error
       @send error
 
-  _handleLast: (err, res, body, server) =>
+  _handleLast: (err, res, body, server, folder) =>
     if err
       @send err
       return
@@ -438,7 +558,7 @@ class HubotJenkinsPlugin extends HubotMessenger
     catch error
       @send error
 
-  _handleLastBuildStatus: (err, res, body, server) =>
+  _handleLastBuildStatus: (err, res, body, server, folder) =>
     if err
       @send err
       return
@@ -454,10 +574,10 @@ class HubotJenkinsPlugin extends HubotMessenger
     catch error
       @send error
 
-  _handleList: (err, res, body, server) =>
+  _handleList: (err, res, body, server, folder) =>
     @_processListResult err, res, body, server
 
-  _handleListInit: (err, res, body, server) =>
+  _handleListInit: (err, res, body, server, folder) =>
     @_processListResult err, res, body, server, false
 
   _processListResult: (err, res, body, server, print = true) =>
@@ -467,7 +587,8 @@ class HubotJenkinsPlugin extends HubotMessenger
 
     try
       content = JSON.parse(body)
-      @_addJobsToJobsList content.jobs, server, print
+      @_outputStatus = print
+      @_makeRootFolderForServer content.jobs, server
       @_initComplete() if @_serverManager.hasInitialized()
     catch error
       @send error
