@@ -20,6 +20,7 @@
 #   hubot jenkins build <job>, <params> - builds the specified Jenkins job with parameters as key=value&key2=value2
 #   hubot jenkins d <jobNumber> - Describes the job specified by jobNumber. List jobs to get number.
 #   hubot jenkins describe <job> - Describes the specified Jenkins job
+#   hubot jenkins describe <job folder> <job name> - Describes the specified Jenkins job
 #   hubot jenkins getAlias <name> - Retrieve value of job name alias
 #   hubot jenkins list <filter> - lists Jenkins jobs grouped by server
 #   hubot jenkins l <jobNumber> - Details about the last build for the job specified by jobNumber. List jobs to get number.
@@ -416,7 +417,7 @@ class HubotJenkinsPlugin extends HubotMessenger
     console.log("Active Requests? #{@_serverManager.hasActiveRequests()}")
     for item in items
       itemType = item._class
-      if (itemType == 'com.cloudbees.hudson.plugins.folder.Folder')
+      if (itemType == 'com.cloudbees.hudson.plugins.folder.Folder' or itemType == 'org.jenkinsci.plugins.workflow.multibranch.WorkflowMultiBranchProject')
         newFolder = new JenkinsFolder(item.name, "#{folder.path}/job/#{@_querystring.escape(item.name)}", folder.depth+1)
         folder.addFolder(newFolder)
         server.activeRequests++
@@ -493,24 +494,43 @@ class HubotJenkinsPlugin extends HubotMessenger
     # check if its a job we already stored
     if (typeof(@msg.match[1]) == "object")
       return @msg.match[1]
-    # otherwise search for it with what the user gave us
-    jobName = @msg.match[1].trim()
+    # check if the user gave us a folder path to follow and a job
+    else
+      # otherwise search for it with what the user gave us
+      # if they gave us a folder use that
+      if (@msg.match[1].indexOf("/") != -1)
+        folderPath = @msg.match[1].split("/")
+        jobName = folderPath[folderPath.length-1]
+        folderPath.splice(folderPath.length-1, 1)
+        
+        # TODO: check with the recursive method first if folderPath's length is only 1
 
-    # if the provided name is an alias, provide it's mapped job name
-    aliases = @_getSavedAliases()
-    jobName     = aliases[jobName] if aliases[jobName]
+        # this is for an absolute path to the folder
+        for server in @_serverManager.listServers()
+          curFolder = server.getFolder()
+          for folderName in folderPath
+            nextFolder = curFolder.getFolderByName(folderName, false)
+          
+        
+      else
+        jobName = @msg.match[1].trim()
 
-    jobName = if escape then @_querystring.escape(jobName) else jobName
+        # if the provided name is an alias, provide it's mapped job name
+        aliases = @_getSavedAliases()
+        jobName     = aliases[jobName] if aliases[jobName]
+
+        jobName = if escape then @_querystring.escape(jobName) else jobName
 	
-    jobs = []
-    # perform lookup
-    for server in @_serverManager.listServers()
-      job = server.getFolder().getJobByName(jobName)
-      if job and job.length > 0
-        jobs = jobs.concat(job)
-    if jobs.length > 1
-      @send "There are multiple jobs with that name, please use an id from `jenkins list` instead."
-    jobs[0] if jobs.length == 1	
+        jobs = []
+        # perform lookup
+        for server in @_serverManager.listServers()
+          job = server.getFolder().getJobByName(jobName)
+          if job and job.length > 0
+            jobs = jobs.concat(job)
+        if jobs.length > 1
+          @send "There are multiple jobs with that name, please use an id from `jenkins list` instead."
+        return jobs[0] if jobs.length == 1
+    return null
 
   # Switch the index with the job name
   _getJobById: =>
