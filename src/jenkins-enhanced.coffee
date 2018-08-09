@@ -149,9 +149,9 @@ class JenkinsFolder
     jobs = @_jobs.where(name: jobName)
     # otherwise we must start searching the other folders
     if (recursive)
-      for folder in @_folders
-        job = folder.getJobByName(jobName)
-        jobs = jobs.concat(job)
+      for subFolder in @_folders
+        subJobs = subFolder.getJobByName(jobName)
+        jobs = jobs.concat(subJobs)
     jobs
 
   hasJobByName: (jobName, recursive=true) =>
@@ -175,9 +175,9 @@ class JenkinsFolder
     folderName = @_querystring.unescape(folderName).trim()
     folders = @_folders.where(name: folderName)
     if (recursive)
-      for folder in @_folders
-        folder = folder.getFolderByName(folderName)
-        folders = folder.concat(folder)
+      for subFolder in @_folders
+        subFolders = subFolder.getFolderByName(folderName)
+        folders = folders.concat(subFolders)
     folders
 
   hasFolderByName: (folderName, recursive=true) =>
@@ -502,16 +502,52 @@ class HubotJenkinsPlugin extends HubotMessenger
         folderPath = @msg.match[1].split("/")
         jobName = folderPath[folderPath.length-1]
         folderPath.splice(folderPath.length-1, 1)
-        
-        # TODO: check with the recursive method first if folderPath's length is only 1
-
-        # this is for an absolute path to the folder
-        for server in @_serverManager.listServers()
-          curFolder = server.getFolder()
-          for folderName in folderPath
-            nextFolder = curFolder.getFolderByName(folderName, false)
-          
-        
+        if (folderPath.length == 1)
+          folders = []
+          for server in @_serverManager.listServers()
+            folders = folders.concat(server.getFolderByName(folderPath[0]))
+          if (folders.length > 1)
+            @send "There are multiple folders with the name #{folderPath[0]}.  Please use `jenkins list` and an ID instead."
+          else if (folders.length == 1)
+            jobs = folders[0].getJobByName(jobName)
+            if (jobs.length > 1)
+              @send "There are multiple jobs with the name #{jobName} in #{folderPath[0]}.  Please use `jenkins list` and an ID instead."
+            else if (jobs.length == 1)
+              return jobs[0]
+            else 
+              @send "There are no jobs with the name #{jobName} in #{folderPath[0]}."
+          else
+            @send "There are no folders with the name #{folderPath[0]}."
+			
+        else
+          # this is for an absolute path to the folder
+          folders = []
+          for server in @_serverManager.listServers()
+            curFolder = server.getFolder()
+            for folderName in folderPath
+              # this should either be of length 1 or length 0, as there cannot be two subfolders with the same name (in iterative mode)
+              nextFolder = curFolder.getFolderByName(folderName, false)
+              if (nextFolder.length == 1)
+                curFolder = nextFolder[0]
+              else
+                curFolder = null
+                break
+            # check if we found a folder
+            if (curFolder)
+              folders.push(curFolder)
+          # now make sure this path is valid for only one folder
+          if (folders.length > 1)
+            @send "There are multiple folders with the path #{folderPath.join('/')}.  Please use `jenkins list` and an ID instead."
+          else if (folders.length == 1)
+            jobs = folders[0].getJobByName(jobName)
+            if (jobs.length > 1)
+              @send "There are multiple jobs with the name #{jobName} in #{folderPath.join('/')}.  Please use `jenkins list` and an ID instead."
+            else if (jobs.length == 1)
+              return jobs[0]
+            else 
+              @send "There are no jobs with the name #{jobName} in #{folderPath.join('/')}."
+          else
+            @send "There are no folders with the path #{folderPath.join('/')}."
       else
         jobName = @msg.match[1].trim()
 
@@ -552,7 +588,6 @@ class HubotJenkinsPlugin extends HubotMessenger
     if server.url.indexOf('https') == 0 then http = 'https://' else http = 'http://'
     url = server.url.replace /^https?:\/\//, ''
     path = "#{http}#{user[0]}:#{user[1]}@#{url}/#{endpoint}"
-    console.log(path)
     request = @msg.http(path)
     @_configureRequest request, server
     request[method]() ((err, res, body) -> callback(err, res, body, server, folder))
