@@ -16,15 +16,14 @@
 #   hubot jenkins aliases - lists all saved job name aliases
 #   hubot jenkins b <jobNumber> - builds the job specified by jobNumber. List jobs to get number.
 #   hubot jenkins b <jobNumber>, <params> - builds the job specified by jobNumber with parameters as key=value&key2=value2. List jobs to get number.
-#   hubot jenkins build <job> - builds the specified Jenkins job
-#   hubot jenkins build <job>, <params> - builds the specified Jenkins job with parameters as key=value&key2=value2
+#   hubot jenkins build <job|alias|job folder/job> - builds the specified Jenkins job
+#   hubot jenkins build <job|alias|job folder/job>, <params> - builds the specified Jenkins job with parameters as key=value&key2=value2
 #   hubot jenkins d <jobNumber> - Describes the job specified by jobNumber. List jobs to get number.
-#   hubot jenkins describe <job> - Describes the specified Jenkins job
-#   hubot jenkins describe <job folder> <job name> - Describes the specified Jenkins job
+#   hubot jenkins describe <job|alias|job folder/job> - Describes the specified Jenkins job
 #   hubot jenkins getAlias <name> - Retrieve value of job name alias
 #   hubot jenkins list <filter> - lists Jenkins jobs grouped by server
 #   hubot jenkins l <jobNumber> - Details about the last build for the job specified by jobNumber. List jobs to get number.
-#   hubot jenkins last <job> - Details about the last build for the specified Jenkins job
+#   hubot jenkins last <job|alias|job folder/job> - Details about the last build for the specified Jenkins job
 #   hubot jenkins servers - Lists known jenkins servers
 #   hubot jenkins setAlias <name>, <value> - creates job name alias
 #   hubot jenkins remAlias <name> - removes job name alias
@@ -294,7 +293,6 @@ class HubotJenkinsPlugin extends HubotMessenger
     if not job
       @reply "I couldn't find that job. Try `jenkins list` to get a list."
       return
-
     @_setJob job
     @build()
 
@@ -414,7 +412,6 @@ class HubotJenkinsPlugin extends HubotMessenger
     @_addJobsToFoldersList(items, server, rootFolder)
 
   _addJobsToFoldersList: (items, server, folder) =>
-    console.log("Active Requests? #{@_serverManager.hasActiveRequests()}")
     for item in items
       itemType = item._class
       if (itemType == 'com.cloudbees.hudson.plugins.folder.Folder' or itemType == 'org.jenkinsci.plugins.workflow.multibranch.WorkflowMultiBranchProject')
@@ -431,12 +428,11 @@ class HubotJenkinsPlugin extends HubotMessenger
     if (not @_serverManager.hasActiveRequests())
       for server in @_serverManager.listServers()
         @_listJobs(server, server.getFolder(), true)
+      @_initComplete() if @_serverManager.hasInitialized()
     
 
   _listJobs: (server, folder, isRoot=false) =>
     response = ""
-    if isRoot
-      response += "Server: #{server.url}\n"
     # go through each folder and list jobs first then other folders, sorted alphabetically for consistency
     for job in folder.getJobs(false)
       @_jobList.push(job) if @_jobList.indexOf(job) == -1
@@ -446,8 +442,7 @@ class HubotJenkinsPlugin extends HubotMessenger
       response += @_listJobs(server, subFolder)
     if isRoot
       if @_outputStatus
-        @send response
-      @_initComplete() if @_serverManager.hasInitialized()
+        @send "Server: #{server.url}\n#{response}"
     else 
       return response
 
@@ -549,6 +544,7 @@ class HubotJenkinsPlugin extends HubotMessenger
           else
             @send "There are no folders with the path #{folderPath.join('/')}."
       else
+        # this is when they just give us a job name
         jobName = @msg.match[1].trim()
 
         # if the provided name is an alias, provide it's mapped job name
@@ -560,12 +556,15 @@ class HubotJenkinsPlugin extends HubotMessenger
         jobs = []
         # perform lookup
         for server in @_serverManager.listServers()
-          job = server.getFolder().getJobByName(jobName)
-          if job and job.length > 0
+          job = server.getJobByName(jobName)
+          if job.length > 0
             jobs = jobs.concat(job)
         if jobs.length > 1
           @send "There are multiple jobs with that name, please use an id from `jenkins list` instead."
-        return jobs[0] if jobs.length == 1
+        else if jobs.length == 1
+          return jobs[0] 
+        else
+          @send "There are no jobs with the name #{jobName}"
     return null
 
   # Switch the index with the job name
