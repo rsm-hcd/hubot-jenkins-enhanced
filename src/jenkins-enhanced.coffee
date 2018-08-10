@@ -485,87 +485,96 @@ class HubotJenkinsPlugin extends HubotMessenger
 
     "HEALTH: #{result}\n"
 
-  _getJob: (escape = false) =>
-    # check if its a job we already stored
+  _getJob: =>
+    job = null
     if (typeof(@msg.match[1]) == "object")
-      return @msg.match[1]
-    # check if the user gave us a folder path to follow and a job
+	  # check if its a job we already stored
+      job = @msg.match[1]
     else
-      # otherwise search for it with what the user gave us
-      # if they gave us a folder use that
+      # check if the user gave us a folder path to follow and a job
       if (@msg.match[1].indexOf("/") != -1)
         folderPath = @msg.match[1].split("/")
         jobName = folderPath[folderPath.length-1]
         folderPath.splice(folderPath.length-1, 1)
+
         if (folderPath.length == 1)
-          folders = []
-          for server in @_serverManager.listServers()
-            folders = folders.concat(server.getFolderByName(folderPath[0]))
-          if (folders.length > 1)
-            @send "There are multiple folders with the name #{folderPath[0]}.  Please use `jenkins list` and an ID instead."
-          else if (folders.length == 1)
-            jobs = folders[0].getJobByName(jobName)
-            if (jobs.length > 1)
-              @send "There are multiple jobs with the name #{jobName} in #{folderPath[0]}.  Please use `jenkins list` and an ID instead."
-            else if (jobs.length == 1)
-              return jobs[0]
-            else 
-              @send "There are no jobs with the name #{jobName} in #{folderPath[0]}."
-          else
-            @send "There are no folders with the name #{folderPath[0]}."
-			
+          # when we only receive the folder name
+          job = @_getJobByFolderName(folderPath[0], jobName)
+          if (!job)
+            @send "There are no folders with the name #{folderPath[0]} that have a job called #{jobName}."
         else
-          # this is for an absolute path to the folder
-          folders = []
-          for server in @_serverManager.listServers()
-            curFolder = server.getFolder()
-            for folderName in folderPath
-              # this should either be of length 1 or length 0, as there cannot be two subfolders with the same name (in iterative mode)
-              nextFolder = curFolder.getFolderByName(folderName, false)
-              if (nextFolder.length == 1)
-                curFolder = nextFolder[0]
-              else
-                curFolder = null
-                break
-            # check if we found a folder
-            if (curFolder)
-              folders.push(curFolder)
-          # now make sure this path is valid for only one folder
-          if (folders.length > 1)
-            @send "There are multiple folders with the path #{folderPath.join('/')}.  Please use `jenkins list` and an ID instead."
-          else if (folders.length == 1)
-            jobs = folders[0].getJobByName(jobName)
-            if (jobs.length > 1)
-              @send "There are multiple jobs with the name #{jobName} in #{folderPath.join('/')}.  Please use `jenkins list` and an ID instead."
-            else if (jobs.length == 1)
-              return jobs[0]
-            else 
-              @send "There are no jobs with the name #{jobName} in #{folderPath.join('/')}."
-          else
-            @send "There are no folders with the path #{folderPath.join('/')}."
+          # when we receive the absolute path to the job
+          job = @_getJobByAbsolutePath(folderPath, jobName)
+          if (!job)
+            @send "There are no folders with the path #{folderPath.join('/')} that have a job called #{jobName}."
       else
-        # this is when they just give us a job name
-        jobName = @msg.match[1].trim()
+        # when we receive no folder information at all and only the job name
+        job = @_getJobByName(@msg.match[1].trim())
+    job
 
-        # if the provided name is an alias, provide it's mapped job name
-        aliases = @_getSavedAliases()
-        jobName     = aliases[jobName] if aliases[jobName]
+  _getJobByFolders: (folders, jobName) =>
+    # find all jobs that are in the folders given, this is based off the presumption that all of the folders have the same name and some may/may not have the job we're searching for
+    jobs = []
+    for folder in folders
+      # only search for jobs in the current folder's directory, otherwise we risk duplicates
+      jobs = jobs.concat(folder.getJobByName(jobName, false))
+    if (jobs.length > 1)
+      # we're safe to just use the first one, as they should all have the same name
+      @send "There are multiple folders with the name #{folders[0].name} that have a job called #{jobName}.  Please use `jenkins list` and an ID instead."
+    else if (jobs.length == 1)
+      return jobs[0] 
+    # no else case because there aren't any folders to pull a name from	to send a message to the user 
+    null
 
-        jobName = if escape then @_querystring.escape(jobName) else jobName
-	
-        jobs = []
-        # perform lookup
-        for server in @_serverManager.listServers()
-          job = server.getJobByName(jobName)
-          if job.length > 0
-            jobs = jobs.concat(job)
-        if jobs.length > 1
-          @send "There are multiple jobs with that name, please use an id from `jenkins list` instead."
-        else if jobs.length == 1
-          return jobs[0] 
+  _getJobByFolderName: (folderName, jobName) =>
+    # find all of the folders that have this name
+    folders = []
+    for server in @_serverManager.listServers()
+      if (folderName == "")
+        # if the folder name is empty, presume they're referencing the root folder
+        folders.push(server.getFolder())
+      else
+        folders = folders.concat(server.getFolderByName(folderName))
+    # find all possible jobs that match in all given folders
+    @_getJobByFolders(folders, jobName)
+
+  _getJobByAbsolutePath: (folderPath, jobName) =>
+    # find all folders that have this path
+    folders = []
+    for server in @_serverManager.listServers()
+      curFolder = server.getFolder()
+      for folderName in folderPath
+        # this should either be of length 1 or length 0, as there cannot be two subfolders with the same name (in iterative mode)
+        nextFolder = curFolder.getFolderByName(folderName, false)
+        if (nextFolder.length == 1)
+          curFolder = nextFolder[0]
         else
-          @send "There are no jobs with the name #{jobName}"
-    return null
+          curFolder = null
+          break
+      # check if we found a folder
+      if (curFolder)
+        folders.push(curFolder)
+    # now find all possible jobs
+    @_getJobByFolders(folders, jobName)
+
+  _getJobByName: (jobName) =>
+    # if the provided name is an alias, provide it's mapped job name
+    aliases = @_getSavedAliases()
+    jobName = aliases[jobName] if aliases[jobName]
+	
+    jobs = []
+    # perform lookup
+    for server in @_serverManager.listServers()
+      job = server.getJobByName(jobName)
+      if job.length > 0
+        jobs = jobs.concat(job)
+    if jobs.length > 1
+      @send "There are multiple jobs with that name, please use an id from `jenkins list` instead or a folder path."
+    else if jobs.length == 1
+      return jobs[0] 
+    else
+      @send "There are no jobs with the name #{jobName}"
+    null
 
   # Switch the index with the job name
   _getJobById: =>
@@ -603,7 +612,7 @@ class HubotJenkinsPlugin extends HubotMessenger
   # --------
   _handleNewFolder: (err, res, body, server, folder) =>
     if err
-      @send err
+      @send "It appears an error occurred while contacting your Jenkins instance.  The error I received was #{err.code} from #{server.url}.  Please verify that your Jenkins instance is configured properly."
       return
 
     try
@@ -614,7 +623,7 @@ class HubotJenkinsPlugin extends HubotMessenger
 
   _handleBuild: (err, res, body, server, folder) =>
     if err
-      @reply err
+      @reply "It appears an error occurred while contacting your Jenkins instance.  The error I received was #{err.code} from #{server.url}.  Please verify that your Jenkins instance is configured properly."
     else if 200 <= res.statusCode < 400 # Or, not an error code.
       job = @_getJob(false)
       @reply "(#{res.statusCode}) Build started for #{job.name} #{server.url}/#{job.path}"
@@ -625,7 +634,7 @@ class HubotJenkinsPlugin extends HubotMessenger
 
   _handleDescribe: (err, res, body, server, folder) =>
     if err
-      @send err
+      @send "It appears an error occurred while contacting your Jenkins instance.  The error I received was #{err.code} from #{server.url}.  Please verify that your Jenkins instance is configured properly."
       return
 
     try
@@ -639,7 +648,7 @@ class HubotJenkinsPlugin extends HubotMessenger
 
   _handleLast: (err, res, body, server, folder) =>
     if err
-      @send err
+      @send "It appears an error occurred while contacting your Jenkins instance.  The error I received was #{err.code} from #{server.url}.  Please verify that your Jenkins instance is configured properly."
       return
 
     try
@@ -655,7 +664,7 @@ class HubotJenkinsPlugin extends HubotMessenger
 
   _handleLastBuildStatus: (err, res, body, server, folder) =>
     if err
-      @send err
+      @send "It appears an error occurred while contacting your Jenkins instance.  The error I received was #{err.code} from #{server.url}.  Please verify that your Jenkins instance is configured properly."
       return
 
     try
@@ -677,7 +686,7 @@ class HubotJenkinsPlugin extends HubotMessenger
 
   _processListResult: (err, res, body, server, print = true) =>
     if err
-      @send err
+      @send "It appears an error occurred while contacting your Jenkins instance.  The error I received was #{err.code} from #{server.url}.  Please verify that your Jenkins instance is configured properly."
       return
 
     try
