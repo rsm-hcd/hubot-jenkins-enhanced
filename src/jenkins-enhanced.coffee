@@ -226,11 +226,19 @@ class JenkinsServerManager extends HubotMessenger
 
   servers: =>
     for server in @_servers
-      jobs = server.getJobs()
-      message = "- #{server.url}"
-      for job in jobs
-        message += "\n-- #{job.name}"
+      message = "#{server.url}\n"
+      message += @_serversSubFoldersAndJobs(server, server.getFolder())
       @send message
+  
+  _serversSubFoldersAndJobs: (server, folder) =>
+    response = ""
+    # add the current folder's jobs first
+    for job in folder.getJobs(false)
+      response += "-".repeat(folder.depth+1)+" #{job.name}\n"
+    # add the sub folder's jobs and folders
+    for subFolder in folder.getFolders(false)
+      response += "-".repeat(folder.depth+1)+" #{subFolder.name}\n"+@_serversSubFoldersAndJobs(server, subFolder)
+    response
 
   _loadConfiguration: =>
     @_addServer process.env.HUBOT_JENKINS_URL, process.env.HUBOT_JENKINS_AUTH
@@ -406,7 +414,7 @@ class HubotJenkinsPlugin extends HubotMessenger
     # make the default/root level folder
     rootFolder = server.getFolder()
     if rootFolder == null
-      rootFolder = new JenkinsFolder("Root", "", -1)
+      rootFolder = new JenkinsFolder("Root", "", 0)
       server.setFolder(rootFolder)
 
     @_addJobsToFoldersList(items, server, rootFolder)
@@ -722,7 +730,7 @@ module.exports = (robot) ->
   robot.respond /j(?:enkins)? aliases/i, id: 'jenkins.aliases', (msg) ->
     pluginFactory(msg).listAliases()
 
-  robot.respond /j(?:enkins)? build ([\w\.\-_ ]+)(, (.+))?/i, id: 'jenkins.build', (msg) ->
+  robot.respond /j(?:enkins)? build (.*)(, (.+))?/i, id: 'jenkins.build', (msg) ->
     pluginFactory(msg).build false
 
   robot.respond /j(?:enkins)? b (\d+)(, (.+))?/i, id: 'jenkins.b', (msg) ->
