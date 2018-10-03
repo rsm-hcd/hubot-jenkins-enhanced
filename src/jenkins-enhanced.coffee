@@ -420,9 +420,10 @@ class HubotJenkinsPlugin extends HubotMessenger
     @_addJobsToFoldersList(items, server, rootFolder)
 
   _addJobsToFoldersList: (items, server, folder) =>
+    jenkinsJobFolderType = ['jenkins.branch.OrganizationFolder','com.cloudbees.hudson.plugins.folder.Folder','org.jenkinsci.plugins.workflow.multibranch.WorkflowMultiBranchProject']    
     for item in items
       itemType = item._class
-      if (itemType == 'com.cloudbees.hudson.plugins.folder.Folder' or itemType == 'org.jenkinsci.plugins.workflow.multibranch.WorkflowMultiBranchProject')
+      if (itemType in jenkinsJobFolderType)
         newFolder = new JenkinsFolder(item.name, "#{folder.path}/job/#{@_querystring.escape(item.name)}", folder.depth+1)
         folder.addFolder(newFolder)
         server.activeRequests++
