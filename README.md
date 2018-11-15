@@ -14,9 +14,9 @@ You can find your access token at $JENKINS_URL/me/configure
 ### Commands
 - ```hubot jenkins aliases``` - lists all saved job name aliases **
 - ```hubot jenkins b <jobNumber>``` - builds the job specified by jobNumber. List jobs to get number.
-- ```hubot jenkins b <jobNumber>, <params>``` - builds the job specified by jobNumber with parameters as key=value&key2=value2. List jobs to get number.
+- ```hubot jenkins b <jobNumber>&<params>``` - builds the job specified by jobNumber with parameters as key=value&key2=value2. List jobs to get number.
 - ```hubot jenkins build <job|alias|job folder/job>``` - builds the specified Jenkins job
-- ```hubot jenkins build <job|alias|job folder/job>, <params>``` - builds the specified Jenkins job with parameters as key=value&key2=value2
+- ```hubot jenkins build <job|alias|job folder/job>&<params>``` - builds the specified Jenkins job with parameters as key=value&key2=value2
 - ```hubot jenkins d <jobNumber>``` - Describes the job specified by jobNumber. List jobs to get number.
 - ```hubot jenkins describe <job|alias|job folder/job>``` - Describes the specified Jenkins job
 - ```hubot jenkins getAlias <name>``` - Retrieve value of job name alias **

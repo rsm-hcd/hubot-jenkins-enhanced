@@ -15,9 +15,9 @@
 # Commands:
 #   hubot jenkins aliases - lists all saved job name aliases
 #   hubot jenkins b <jobNumber> - builds the job specified by jobNumber. List jobs to get number.
-#   hubot jenkins b <jobNumber>, <params> - builds the job specified by jobNumber with parameters as key=value&key2=value2. List jobs to get number.
+#   hubot jenkins b <jobNumber>&<params> - builds the job specified by jobNumber with parameters as key=value&key2=value2. List jobs to get number.
 #   hubot jenkins build <job|alias|job folder/job> - builds the specified Jenkins job
-#   hubot jenkins build <job|alias|job folder/job>, <params> - builds the specified Jenkins job with parameters as key=value&key2=value2
+#   hubot jenkins build <job|alias|job folder/job>&<params> - builds the specified Jenkins job with parameters as key=value&key2=value2
 #   hubot jenkins d <jobNumber> - Describes the job specified by jobNumber. List jobs to get number.
 #   hubot jenkins describe <job|alias|job folder/job> - Describes the specified Jenkins job
 #   hubot jenkins getAlias <name> - Retrieve value of job name alias
@@ -731,10 +731,10 @@ module.exports = (robot) ->
   robot.respond /j(?:enkins)? aliases/i, id: 'jenkins.aliases', (msg) ->
     pluginFactory(msg).listAliases()
 
-  robot.respond /j(?:enkins)? build (.*)(, (.+))?/i, id: 'jenkins.build', (msg) ->
+  robot.respond /j(?:enkins)? build ([^&]+)(&\s?(.+))?/i, id: 'jenkins.build', (msg) ->
     pluginFactory(msg).build false
 
-  robot.respond /j(?:enkins)? b (\d+)(, (.+))?/i, id: 'jenkins.b', (msg) ->
+  robot.respond /j(?:enkins)? b (\d+)(&\s?(.+))?/i, id: 'jenkins.b', (msg) ->
     pluginFactory(msg).buildById()
 
   robot.respond /j(?:enkins)? list( (.+))?/i, id: 'jenkins.list', (msg) ->
