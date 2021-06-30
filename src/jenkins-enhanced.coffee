@@ -15,9 +15,9 @@
 # Commands:
 #   hubot jenkins aliases - lists all saved job name aliases
 #   hubot jenkins b <jobNumber> - builds the job specified by jobNumber. List jobs to get number.
-#   hubot jenkins b <jobNumber>, <params> - builds the job specified by jobNumber with parameters as key=value&key2=value2. List jobs to get number.
+#   hubot jenkins b <jobNumber>&<params> - builds the job specified by jobNumber with parameters as key=value&key2=value2. List jobs to get number.
 #   hubot jenkins build <job|alias|job folder/job> - builds the specified Jenkins job
-#   hubot jenkins build <job|alias|job folder/job>, <params> - builds the specified Jenkins job with parameters as key=value&key2=value2
+#   hubot jenkins build <job|alias|job folder/job>&<params> - builds the specified Jenkins job with parameters as key=value&key2=value2
 #   hubot jenkins d <jobNumber> - Describes the job specified by jobNumber. List jobs to get number.
 #   hubot jenkins describe <job|alias|job folder/job> - Describes the specified Jenkins job
 #   hubot jenkins getAlias <name> - Retrieve value of job name alias
@@ -229,7 +229,7 @@ class JenkinsServerManager extends HubotMessenger
       message = "#{server.url}\n"
       message += @_serversSubFoldersAndJobs(server, server.getFolder())
       @send message
-  
+
   _serversSubFoldersAndJobs: (server, folder) =>
     response = ""
     # add the current folder's jobs first
@@ -261,14 +261,14 @@ class HubotJenkinsPlugin extends HubotMessenger
 
   _serverManager: null
   _querystring: null
-  # stores jobs, across all servers, in flat list to support 'buildById'
+# stores jobs, across all servers, in flat list to support 'buildById'
   _folderList: []
   _jobList: []
   _params: null
-  # stores a function to be called after the initial 'list' has completed
+# stores a function to be called after the initial 'list' has completed
   _delayedFunction: null
-  # Init
-  # ----
+# Init
+# ----
 
   constructor: (msg, serverManager) ->
     super msg
@@ -292,8 +292,8 @@ class HubotJenkinsPlugin extends HubotMessenger
       ), 1000)
 
 
-  # Public API
-  # ----------
+# Public API
+# ----------
 
   buildById: =>
     return if not @_init(@buildById)
@@ -322,7 +322,7 @@ class HubotJenkinsPlugin extends HubotMessenger
     job = @_getJobById()
     if not job
       @reply "I couldn't find that job. Try `jenkins list` to get a list."
-      return  
+      return
     @_setJob job
     @describe()
 
@@ -348,10 +348,10 @@ class HubotJenkinsPlugin extends HubotMessenger
     job = @_getJobById()
     if not job
       @reply "I couldn't find that job. Try `jenkins list` to get a list."
-      return  
+      return
     @_setJob job
     @last()
-	
+
   last: =>
     return if not @_init(@last)
     job = @_getJob()
@@ -389,7 +389,7 @@ class HubotJenkinsPlugin extends HubotMessenger
     aliases[aliasKey] = aliasValue
     @robot.brain.set 'jenkins_aliases', aliases
     @msg.send "'#{aliasKey}' is now an alias for '#{aliasValue}'"
-	
+
   remAlias: =>
     aliases    = @_getSavedAliases()
     aliasKey   = @msg.match[1]
@@ -405,8 +405,8 @@ class HubotJenkinsPlugin extends HubotMessenger
   setRobot: (robot) =>
     @robot = robot
 
-  # Utility Methods
-  # ---------------
+# Utility Methods
+# ---------------
 
   _makeRootFolderForServer: (items, server) =>
     response = ""
@@ -420,7 +420,7 @@ class HubotJenkinsPlugin extends HubotMessenger
     @_addJobsToFoldersList(items, server, rootFolder)
 
   _addJobsToFoldersList: (items, server, folder) =>
-    jenkinsJobFolderType = ['jenkins.branch.OrganizationFolder','com.cloudbees.hudson.plugins.folder.Folder','org.jenkinsci.plugins.workflow.multibranch.WorkflowMultiBranchProject']    
+    jenkinsJobFolderType = ['jenkins.branch.OrganizationFolder','com.cloudbees.hudson.plugins.folder.Folder','org.jenkinsci.plugins.workflow.multibranch.WorkflowMultiBranchProject']
     for item in items
       itemType = item._class
       if (itemType in jenkinsJobFolderType)
@@ -438,7 +438,7 @@ class HubotJenkinsPlugin extends HubotMessenger
       for server in @_serverManager.listServers()
         @_listJobs(server, server.getFolder(), true)
       @_initComplete() if @_serverManager.hasInitialized()
-    
+
 
   _listJobs: (server, folder, isRoot=false) =>
     response = ""
@@ -452,7 +452,7 @@ class HubotJenkinsPlugin extends HubotMessenger
     if isRoot
       if @_outputStatus
         @send "Server: #{server.url}\n#{response}"
-    else 
+    else
       return response
 
   _configureRequest: (request, server = null) =>
@@ -497,50 +497,50 @@ class HubotJenkinsPlugin extends HubotMessenger
   _getJob: =>
     job = null
     if (typeof(@msg.match[1]) == "object")
-	  # check if its a job we already stored
+# check if its a job we already stored
       job = @msg.match[1]
     else
-      # check if the user gave us a folder path to follow and a job
+# check if the user gave us a folder path to follow and a job
       if (@msg.match[1].indexOf("/") != -1)
         folderPath = @msg.match[1].split("/")
         jobName = folderPath[folderPath.length-1]
         folderPath.splice(folderPath.length-1, 1)
 
         if (folderPath.length == 1)
-          # when we only receive the folder name
+# when we only receive the folder name
           job = @_getJobByFolderName(folderPath[0], jobName)
           if (!job)
             @send "There are no folders with the name #{folderPath[0]} that have a job called #{jobName}."
         else
-          # when we receive the absolute path to the job
+# when we receive the absolute path to the job
           job = @_getJobByAbsolutePath(folderPath, jobName)
           if (!job)
             @send "There are no folders with the path #{folderPath.join('/')} that have a job called #{jobName}."
       else
-        # when we receive no folder information at all and only the job name
+# when we receive no folder information at all and only the job name
         job = @_getJobByName(@msg.match[1].trim())
     job
 
   _getJobByFolders: (folders, jobName) =>
-    # find all jobs that are in the folders given, this is based off the presumption that all of the folders have the same name and some may/may not have the job we're searching for
+# find all jobs that are in the folders given, this is based off the presumption that all of the folders have the same name and some may/may not have the job we're searching for
     jobs = []
     for folder in folders
-      # only search for jobs in the current folder's directory, otherwise we risk duplicates
+# only search for jobs in the current folder's directory, otherwise we risk duplicates
       jobs = jobs.concat(folder.getJobByName(jobName, false))
     if (jobs.length > 1)
-      # we're safe to just use the first one, as they should all have the same name
+# we're safe to just use the first one, as they should all have the same name
       @send "There are multiple folders with the name #{folders[0].name} that have a job called #{jobName}.  Please use `jenkins list` and an ID instead."
     else if (jobs.length == 1)
-      return jobs[0] 
-    # no else case because there aren't any folders to pull a name from	to send a message to the user 
+      return jobs[0]
+    # no else case because there aren't any folders to pull a name from	to send a message to the user
     null
 
   _getJobByFolderName: (folderName, jobName) =>
-    # find all of the folders that have this name
+# find all of the folders that have this name
     folders = []
     for server in @_serverManager.listServers()
       if (folderName == "")
-        # if the folder name is empty, presume they're referencing the root folder
+# if the folder name is empty, presume they're referencing the root folder
         folders.push(server.getFolder())
       else
         folders = folders.concat(server.getFolderByName(folderName))
@@ -548,12 +548,12 @@ class HubotJenkinsPlugin extends HubotMessenger
     @_getJobByFolders(folders, jobName)
 
   _getJobByAbsolutePath: (folderPath, jobName) =>
-    # find all folders that have this path
+# find all folders that have this path
     folders = []
     for server in @_serverManager.listServers()
       curFolder = server.getFolder()
       for folderName in folderPath
-        # this should either be of length 1 or length 0, as there cannot be two subfolders with the same name (in iterative mode)
+# this should either be of length 1 or length 0, as there cannot be two subfolders with the same name (in iterative mode)
         nextFolder = curFolder.getFolderByName(folderName, false)
         if (nextFolder.length == 1)
           curFolder = nextFolder[0]
@@ -567,10 +567,10 @@ class HubotJenkinsPlugin extends HubotMessenger
     @_getJobByFolders(folders, jobName)
 
   _getJobByName: (jobName) =>
-    # if the provided name is an alias, provide it's mapped job name
+# if the provided name is an alias, provide it's mapped job name
     aliases = @_getSavedAliases()
     jobName = aliases[jobName] if aliases[jobName]
-	
+
     jobs = []
     # perform lookup
     for server in @_serverManager.listServers()
@@ -580,12 +580,12 @@ class HubotJenkinsPlugin extends HubotMessenger
     if jobs.length > 1
       @send "There are multiple jobs with that name, please use an id from `jenkins list` instead or a folder path."
     else if jobs.length == 1
-      return jobs[0] 
+      return jobs[0]
     else
       @send "There are no jobs with the name #{jobName}"
     null
 
-  # Switch the index with the job name
+# Switch the index with the job name
   _getJobById: =>
     @_jobList[parseInt(@msg.match[1]) - 1]
 
@@ -617,8 +617,8 @@ class HubotJenkinsPlugin extends HubotMessenger
     @msg.match[1] = job
 
 
-  # Handlers
-  # --------
+# Handlers
+# --------
   _handleNewFolder: (err, res, body, server, folder) =>
     if err
       @send "It appears an error occurred while contacting your Jenkins instance.  The error I received was #{err.code} from #{server.url}.  Please verify that your Jenkins instance is configured properly."
@@ -708,8 +708,8 @@ class HubotJenkinsPlugin extends HubotMessenger
 
 module.exports = (robot) ->
 
-  # Factories
-  # ---------
+# Factories
+# ---------
 
   _serverManager = null
   serverManagerFactory = (msg) ->
@@ -731,10 +731,10 @@ module.exports = (robot) ->
   robot.respond /j(?:enkins)? aliases/i, id: 'jenkins.aliases', (msg) ->
     pluginFactory(msg).listAliases()
 
-  robot.respond /j(?:enkins)? build (.*)(, (.+))?/i, id: 'jenkins.build', (msg) ->
+  robot.respond /j(?:enkins)? build ([^&]+)(&\s?(.+))?/i, id: 'jenkins.build', (msg) ->
     pluginFactory(msg).build false
 
-  robot.respond /j(?:enkins)? b (\d+)(, (.+))?/i, id: 'jenkins.b', (msg) ->
+  robot.respond /j(?:enkins)? b (\d+)(&\s?(.+))?/i, id: 'jenkins.b', (msg) ->
     pluginFactory(msg).buildById()
 
   robot.respond /j(?:enkins)? list( (.+))?/i, id: 'jenkins.list', (msg) ->
@@ -742,7 +742,7 @@ module.exports = (robot) ->
 
   robot.respond /j(?:enkins)? describe (.*)/i, id: 'jenkins.describe', (msg) ->
     pluginFactory(msg).describe()
-	
+
   robot.respond /j(?:enkins)? d (\d+)/i, id: 'jenkins.d', (msg) ->
     pluginFactory(msg).describeById()
 
@@ -760,7 +760,7 @@ module.exports = (robot) ->
 
   robot.respond /j(?:enkins)? setAlias (.*), (.*)/i, id: 'jenkins.setAlias', (msg) ->
     pluginFactory(msg).setAlias()
-	
+
   robot.respond /j(?:enkins)? remAlias (.*)/i, id: 'jenkins.remAlias', (msg) ->
     pluginFactory(msg).remAlias()
 
