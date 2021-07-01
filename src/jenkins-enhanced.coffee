@@ -368,8 +368,7 @@ class HubotJenkinsPlugin extends HubotMessenger
     @_requestFactory "api/json", if isInit then @_handleListInit else @_handleList
 
   filterList: (isInit = false) =>
-    server = process.env.HUBOT_JENKINS_URL
-    @_requestFactorySingle server, null, "view/Application/api/json?tree=jobs[name,color]", @_handleFilterList
+    @_requestFactory "view/Application/api/json?tree=jobs[name,color]", if isInit then @_handleFilterListInit else @_handleFilterList
 
   listAliases: =>
     aliases  = @_getSavedAliases()
@@ -723,7 +722,7 @@ class HubotJenkinsPlugin extends HubotMessenger
     try
       content = JSON.parse(body)
       @_outputStatus = print
-      @send content
+      @_makeRootFolderForServer content.jobs, server
     catch error
       @send error
 
