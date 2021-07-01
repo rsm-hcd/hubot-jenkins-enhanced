@@ -22,6 +22,7 @@
 #   hubot jenkins describe <job|alias|job folder/job> - Describes the specified Jenkins job
 #   hubot jenkins getAlias <name> - Retrieve value of job name alias
 #   hubot jenkins list <filter> - lists Jenkins jobs grouped by server
+#   hubot jenkins filter <view> - lists Jenkins jobs grouped by view
 #   hubot jenkins l <jobNumber> - Details about the last build for the job specified by jobNumber. List jobs to get number.
 #   hubot jenkins last <job|alias|job folder/job> - Details about the last build for the specified Jenkins job
 #   hubot jenkins servers - Lists known jenkins servers
@@ -369,7 +370,6 @@ class HubotJenkinsPlugin extends HubotMessenger
 
   filterList: (isInit = false) =>
     tab = @msg.match[1].trim()
-    console.log(tab)
     @_requestFactory "view/#{tab}/api/json?tree=jobs[name,color]", if isInit then @_handleFilterListInit else @_handleFilterList
 
   listAliases: =>
