@@ -762,7 +762,7 @@ module.exports = (robot) ->
   robot.respond /j(?:enkins)? list( (.+))?/i, id: 'jenkins.list', (msg) ->
     pluginFactory(msg).list()
 
-  robot.respond /j(?:enkins)? list filter( (.+))?/i, id: 'jenkins.filterList', (msg) ->
+  robot.respond /j(?:enkins)? filter( (.+))?/i, id: 'jenkins.filterList', (msg) ->
     pluginFactory(msg).filterList()
 
   robot.respond /j(?:enkins)? describe (.*)/i, id: 'jenkins.describe', (msg) ->
