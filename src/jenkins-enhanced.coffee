@@ -368,7 +368,9 @@ class HubotJenkinsPlugin extends HubotMessenger
     @_requestFactory "api/json", if isInit then @_handleListInit else @_handleList
 
   filterList: (isInit = false) =>
-    @_requestFactory "view/#{@msg.match[1]}/api/json?tree=jobs[name,color]", if isInit then @_handleFilterListInit else @_handleFilterList
+    tab = @msg.match[1]
+    console.log(`tab: ${tab}`)
+    @_requestFactory "view/#{tab}/api/json?tree=jobs[name,color]", if isInit then @_handleFilterListInit else @_handleFilterList
 
   listAliases: =>
     aliases  = @_getSavedAliases()
