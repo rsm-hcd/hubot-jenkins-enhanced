@@ -367,6 +367,9 @@ class HubotJenkinsPlugin extends HubotMessenger
   list: (isInit = false) =>
     @_requestFactory "api/json", if isInit then @_handleListInit else @_handleList
 
+  filterList: (isInit = false) =>
+    @_requestFactory "api/json", if isInit then @_handleFilterListInit else @_handleFilterList
+
   listAliases: =>
     aliases  = @_getSavedAliases()
     response = []
@@ -690,10 +693,28 @@ class HubotJenkinsPlugin extends HubotMessenger
   _handleList: (err, res, body, server, folder) =>
     @_processListResult err, res, body, server
 
+  _handleFilterList: (err, res, body, server, folder) =>
+    @_processFilterListResult err, res, body, server
+
   _handleListInit: (err, res, body, server, folder) =>
     @_processListResult err, res, body, server, false
 
+  _handleFilterListInit: (err, res, body, server, folder) =>
+    @_processFilterListResult err, res, body, server, false
+
   _processListResult: (err, res, body, server, print = true) =>
+    if err
+      @send "It appears an error occurred while contacting your Jenkins instance.  The error I received was #{err.code} from #{server.url}.  Please verify that your Jenkins instance is configured properly."
+      return
+
+    try
+      content = JSON.parse(body)
+      @_outputStatus = print
+      @_makeRootFolderForServer content.jobs, server
+    catch error
+      @send error
+
+  _processFilterListResult: (err, res, body, server, print = true) =>
     if err
       @send "It appears an error occurred while contacting your Jenkins instance.  The error I received was #{err.code} from #{server.url}.  Please verify that your Jenkins instance is configured properly."
       return
@@ -739,6 +760,9 @@ module.exports = (robot) ->
 
   robot.respond /j(?:enkins)? list( (.+))?/i, id: 'jenkins.list', (msg) ->
     pluginFactory(msg).list()
+
+  robot.respond /j(?:enkins)? list filter( (.+))?/i, id: 'jenkins.filterList', (msg) ->
+    pluginFactory(msg).filterList()
 
   robot.respond /j(?:enkins)? describe (.*)/i, id: 'jenkins.describe', (msg) ->
     pluginFactory(msg).describe()
