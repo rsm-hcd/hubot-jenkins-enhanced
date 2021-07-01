@@ -1,7 +1,7 @@
 {
   "name": "hubot-jenkins-enhanced",
   "description": "Jenkins integration for Hubot with multiple server support",
-  "version": "1.2.3",
+  "version": "1.2.4",
   "author": "Winton De Shong <contact@winton.me>",
   "contributors": [
     "Zack Hable <zack@cobaltdevteam.com>"
